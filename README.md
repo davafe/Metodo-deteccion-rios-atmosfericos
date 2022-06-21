@@ -1,5 +1,6 @@
 # Método detección Ríos Atmosféricos
 
+Método de detección de ríos atmosféricos del TFM de David Vázquez Fernández. MUM US.
 
 
 Archivo persim_estable.py es la computación en python de la primera etapa del método
