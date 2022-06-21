@@ -25,7 +25,7 @@ library(MASS)
 
 
 
-persim<-as.data.table(read_csv("mestrado/tfm-solicitude bolsa/piton/persim_estable_daily45.csv", 
+persim<-as.data.table(read_csv("mestrado/tfm-solicitude bolsa/piton/persim_estable45.csv", 
                                col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                 t = col_double())))
 
@@ -45,7 +45,7 @@ colnames(persim)[-c(1,2)]<-paste0("X",colnames(persim)[-c(1,2)])
 
 
 #persim<-persim[, 1:137] #solo dim 1
-#persim<-persim[, 138:257] #solo dim 0
+persim<-persim[, -(3:137)] #solo dim 0
 
 
 #Unimos las etiquetas AR a las imágenes de persistencia equilibradas

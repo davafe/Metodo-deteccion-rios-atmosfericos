@@ -45,7 +45,7 @@ colnames(persim)[-c(1,2)]<-paste0("X",colnames(persim)[-c(1,2)])
 
 
 #persim<-persim[, 1:137] #solo dim 1
-#persim<-persim[, 138:257] #solo dim 0
+#persim<-persim[, -(3:127)] #solo dim 0
 
 
 #Unimos las etiquetas AR a las imágenes de persistencia equilibradas
