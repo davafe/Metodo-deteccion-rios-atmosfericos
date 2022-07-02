@@ -1,6 +1,6 @@
 #######   1- Carga de librerías
 
-from email.headerregistry import ContentTypeHeader #creo que no se usa
+#from email.headerregistry import ContentTypeHeader # no se usa
 from netCDF4 import Dataset as readnc
 import gudhi as gd  
 import numpy as np
