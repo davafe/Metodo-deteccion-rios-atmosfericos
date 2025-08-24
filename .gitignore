@@ -36,6 +36,8 @@ ARenv/*
 # Excluir Jupyter notebooks (el seguimiento se hará mediante su emparejamiento con scripts Python)
 *.ipynb
 
+# Excluding .Rhistory
+*.Rhistory
 
 ### DESDE AQUÍ, PANTILLA ###
 
