@@ -1,5 +1,5 @@
 ### Script comparación resultados de diversos métodos de aprendizaje automático en detección de ríos atmosféricos.
-### El imput es el de las imágenes de persistencia 0 y 1 dimensionales
+### El imput es el de los vectores que traquean el tamaño de la componente conexa más vieja
 
 
 
@@ -15,12 +15,7 @@ library(MASS)
 library(caret)
 
 
-###MIRAR SI SE HA PUESTO EL ROWNAME COMO COLUMNA EN LOS READ_csv, EN FUNCION DE ESO ELIMINAR LA PRIMERA COLUMNA O NO EN EL MERGE (PARA AMBOS DATA TABLE)
-###TAMBIEN SI SE PUSO EL ROWNAME COMO COLUMNA CAMBIAR LO TRATAR POR SEPAREADO A
-#LOS NNOMBRES DE COLUMNA 1,2 POR LOS NOMBRES DE COLUMNA 1,2,3
-
-
-daily <- 1
+daily <- 1 #si vale 1 solo se usan fotos con frecuencia diaria, otro valor se usan fotos con frecuencia 3-horaria
 
 
 #Variables que indican si se escala en cada algoritmo:
@@ -34,6 +29,11 @@ escalar_SVM_LINEAL<- FALSE #TRUE
 escalar_SVM_POLIN<- FALSE 
 escalar_SVM_SIGMO<- FALSE 
 
+# Umbral usado en la probabilidad para predecir AR en regresión logística
+
+threshold_logistic_prediction <- 0.5
+
+# funciones generadoras de datasets
 
 generar_folds_datos <- function(dataset_equilibrado, x, fold, y_var_name="AR", escalar = FALSE) {
   
@@ -163,11 +163,11 @@ etiquetas[,AR:=as.factor(etiquetas[,AR])] # Variable AR la convertimos en factor
 #cambiamos nombres variables año e imagen 
 colnames(topological_info)[1:2]<-colnames(etiquetas)[1:2]
 
-#cambiamos nombres variables de imágenes de persistencia
+#cambiamos nombres variables topológicas predictoras
 colnames(topological_info)[-c(1,2)]<-paste0("X",colnames(topological_info)[-c(1,2)])
 
 
-#Unimos las etiquetas AR a las imágenes de persistencia equilibradas
+#Unimos las etiquetas AR a las variables topológicas predictoras
 dataset_desequilibrado<-merge(x=etiquetas[,], y=topological_info[,], by=colnames(etiquetas)[1:2], all.y=FALSE, all.x=FALSE)
 
 table(dataset_desequilibrado[, AR])
@@ -225,8 +225,7 @@ set.seed(456)
 ##accuracy en el conjunto de entrenamiento. Luego calculamos accuracy, precision y sensitividad en conjunto test.
 ## # Finalmente imprimimos estos vectores de acc, prec y sens y sus medias.
 ### Hiperparámetros: k \in \{1,2,..., 10, 15, 20, ..., 75\}
-### En la definicion de datos_t/v/test_estand vemos si escalamos (o no) juntos (o no) los datos de
-### entrenamiento/validacion/test
+
 
 accuracy<-vector(mode = "double", length=5)
 precision<-vector(mode = "double", length=5)
@@ -310,7 +309,6 @@ cat(precision, mean(precision), "\n")
 ##accuracy en el conjunto de entrenamiento. Luego calculamos accuracy, precision y sensitividad en conjunto test.
 ## # Finalmente imprimimos estos vectores de acc, prec y sens y sus medias.
 ### Hiperparámetros: C y gamma
-###  En la definicion de x_scalado vemos si escalamos los datos antes de meterlos en la SVM
 
 accuracy_radial<-vector(mode = "double", length=5)
 precision_radial<-vector(mode = "double", length=5)
@@ -388,7 +386,6 @@ cat(C_fold_radial, "\n")
 ##accuracy en el conjunto de entrenamiento. Luego calculamos accuracy, precision y sensitividad en conjunto test.
 ## # Finalmente imprimimos estos vectores de acc, prec y sens y sus medias.
 ### Hiperparámetros: C 
-###  En la definicion de x_scalado vemos si escalamos los datos antes de meterlos en la SVM
 
 
 accuracy_lineal<-vector(mode = "double", length=5)
@@ -461,7 +458,6 @@ cat(C_fold_lineal, "\n")
 ##accuracy en el conjunto de entrenamiento. Luego calculamos accuracy, precision y sensitividad en conjunto test.
 ### Finalmente imprimimos estos vectores de acc, prec y sens y sus medias.
 ### Hiperparámetros: C, gamma, grado, intercepto
-###  En la definicion de x_scalado vemos si escalamos los datos antes de meterlos en la SVM
 
 accuracy_polinomial<-vector(mode = "double", length=5)
 precision_polinomial<-vector(mode = "double", length=5)
@@ -551,8 +547,7 @@ cat(grado_fold_polinomial, "\n")
 ##accuracy en el conjunto de entrenamiento. Luego calculamos accuracy, precision y sensitividad en conjunto test.
 ## # Finalmente imprimimos estos vectores de acc, prec y sens y sus medias.
 ### Hiperparámetros: C, gamma, intercepto
-###  En la definicion de x_scalado vemos si escalamos los datos antes de meterlos en la SVM
-                                                      
+
 accuracy_sigmoid<-vector(mode = "double", length=5)
 precision_sigmoid<-vector(mode = "double", length=5)
 sensitividad_sigmoid<-vector(mode = "double", length=5)
@@ -692,7 +687,7 @@ for (i in 1:5){
                    direction="forward", #"backward",
                    k=2 ,trace=0)
   prob_test=predict(logis_bw,newdata=conjunto_test, type="response", se =T)
-  pred_test=predic(prob_test$fit, dim(conjunto_test)[1], threshold=0.5) #datos_estandarizados[test_random] datos estandarizados variables predictoras en conjunto test
+  pred_test=predic(prob_test$fit, dim(conjunto_test)[1], threshold=threshold_logistic_prediction) #datos_estandarizados[test_random] datos estandarizados variables predictoras en conjunto test
   
   
   
