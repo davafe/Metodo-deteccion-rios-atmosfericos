@@ -14,6 +14,10 @@ from persim import PersistenceImager
 import matplotlib.pyplot as plt
 import gc
 
+####### 1.1 - Importing local modules
+
+from local_functions.elder_conected_components import *
+from local_functions.matrix import *
 
 #######   2- Parametros
 
@@ -24,14 +28,26 @@ me="01"
 hor="00"
 
 nomes=["ano", "t"]
-pivote1=47.8
-pivote2=40.5
-pivote3=22.8
+pivot1=47.8
+pivot2=40.5
+pivot3=22.8
 lat_min=19
 lat_max=56
 lon_min=-179
 lon_max=-109
-daily=0 #vale 1 si consideramos solo datos con precisión diaria y no 3-horaria (cojemos los datos de las imágenes 0,8,16, ... corespondientes a las 00)
+daily=1 #vale 1 si consideramos solo datos con precisión diaria y no 3-horaria (cojemos los datos de las imágenes 0,8,16, ... corespondientes a las 00)
+bug=1 #vale 1 si queremos compararnos con el bug detectado en persim_estable del paper, otro valor es el caso contrario
+if bug==1:
+    bug_text="bug"
+else: 
+    bug_text=""
+
+proof = 0 # vale 1 si hacemos prueba con muchos menos imágenes
+
+p = 0.25
+
+
+hard_drive_letter="D"
 
 pixel_size_dimcero=5#tamaño del pixel de las imágenes de persistencia de dimensión 0
 pixel_size_dimuno=4#tamaño del pixel de las imágenes de persistencia de dimensión 1
@@ -43,10 +59,12 @@ pixel_size_dimuno=4#tamaño del pixel de las imágenes de persistencia de dimens
 
 #######  3- Calculamos las coordenadas de la región de estudio y las subregiones de interés para descartar componentes conexas 
 
-direccion="E:"'\\'+str(an)+"\ARTMIP_MERRA_2D_"+str(an)+me+di+"_"+hor+".nc"
-print(direccion)
 
-ncfile = readnc(direccion, "r") #leemos los datos
+path=hard_drive_letter+":/"+str(an)+"/ARTMIP_MERRA_2D_"+str(an)+me+di+"_"+hor+".nc"
+print(path)
+
+ncfile = readnc(path, "r") #leemos los datos
+
 
 lat=ncfile.variables["lat"][:] #vector de latitudes
 la=(lat>=lat_min)&(lat<=lat_max) #nos quedamos con las latitudes que nos interesan (las de la región del estudio)
@@ -56,28 +74,17 @@ lon=ncfile.variables["lon"][:]#vector de longitudes
 
 lo=(lon>=lon_min)&(lon<=lon_max) #nos quedamos con las longitudes que nos interesan (las de la región del estudio)
   
-lats_usadas=ma.getdata(lat[la]) #filtamos latitudes
-lons_usadas=ma.getdata(lon[lo]) #filtramos longitudes
-#latlon=((lats_usadas>38.9+0*lons_usadas))
+lats_used=ma.getdata(lat[la]) #filtamos latitudes
+lons_used=ma.getdata(lon[lo]) #filtramos longitudes
+lathawai=(lat[la]>=lat_min)&(lat[la]<pivot3) #latitudes de hawwai
 
-lons_america=[[]] * lats_usadas.shape[0] #creamos una lista de listas, una por cada latitud, que nos indica, para cada latitud que longitudes corresponden con el continente americano
+hawai_matrix = np.zeros((len(lats_used), len(lons_used)), dtype=bool)
+    # Usar indexación booleana para asignar True a las filas correspondientes
+hawai_matrix[lathawai, :] = True
 
-lathawai=(lat[la]>=lat_min)&(lat[la]<22.8) #latitudes de hawwai
-
-for i in np.arange(0,lats_usadas.shape[0] , 1):
-    if lats_usadas[i]>pivote2:
-        if lats_usadas[i]<= pivote1:
-            lons_america[i]=(lons_usadas>-125.5)
-        else:
-           lons_america[i]=(lons_usadas>-1.411*lats_usadas[i]-58.465)
-    else: 
-        if lats_usadas[i]>=pivote3:
-            lons_america[i]=(lons_usadas>-0.758*lats_usadas[i]-95.1132)
-        else:
-           lons_america[i]=(lons_usadas>-109)
-
-lons_america=[[]] * lats_usadas.shape[0]  #lista donde para cada indice de latitudes que usamos ponemos un array donde es TRUE las longitudes que se corresponden con America
-
+# Obtener la matrix
+america = obtain_boolean_matrix(lats_used, lons_used, pivot1, pivot2, pivot3)
+print(america)
 
 
 
@@ -99,8 +106,8 @@ def get_key(val, dicc):
 ####### 5- Definimos variables de tamaño y vectores para ciertos grupos. Inicializamos listas y valores.
 
 #print(type(tmq))
-longlat=lats_usadas.shape[0] #número de latitudes y de longitudes
-longlon=lons_usadas.shape[0]
+longlat=lats_used.shape[0] #número de latitudes y de longitudes
+longlon=lons_used.shape[0]
 print("dimensiones array=" , longlat, longlon)
 
 
@@ -117,52 +124,61 @@ persis1=[] #lista dónde por cada imagen tenemos sus features 1 dim
 
 
 if daily==1:
-    horasvalue=np.array(['00'])
+    hoursvalue=np.array(['00'])
 else:
-    horasvalue=np.array(['00', '03', '06', '09', '12', '15', '18', '21'])
+    hoursvalue=np.array(['00', '03', '06', '09', '12', '15', '18', '21'])
 diccionario={} ##diccionario que para cada año nos va a decir que número de imagen se corresponde con la primera imagen del año
 
+
+if proof==1: 
+    yearsvalue=np.array([1980])
+else:
+    yearsvalue=np.arange(1980,2018,1)
 
 nfila=0 ##contador del número de imágenes ya computadas
 
 
 
-########6- Bucle de computación de persistencia. Leemos la matriz de datos para cada año, mes, día y hora. Para cada ano y para cada mes el número de días del mes varía.
+########6- Bucle de computación de persistencia. Leemos la matriz de datos para cada año, mes, día y hora. Para cada año y para cada mes el número de días del mes varía.
 ##Primero modificamos la filterfun para que los conjuntos de nivel superior no contengan componentes conexas que no intersequen ni la cossta americana ni las latitudes de hawai
 # # y luego calculamos el complejo cúbico y sus persitencias 0 y 1 dimensionales
 
-for ano in np.arange(1980,2018,1):
+for year in yearsvalue:
 
 
 
     im=0
-    diccionario[ano]=nfila
-    print(diccionario[ano])
+    diccionario[year]=nfila
+    print(diccionario[year])
 
-    if ano==2017:
-        mesesvalue=np.array([ '01', '02', '03', '04', '05', '06'])
+    if year==2017:
+        monthvalues=np.array([ '01', '02', '03', '04', '05', '06'])
     else:
-        mesesvalue=np.array([ '01', '02', '03', '04', '05', '06',  '07', '08', '09', '10', '11', '12'])
+        monthvalues=np.array([ '01', '02', '03', '04', '05', '06',  '07', '08', '09', '10', '11', '12'])
 
+    if proof==1:
+        monthvalues=np.array([ '01', '02'])
 
+    for month in monthvalues:
+        print("We begin to compute connected components of images of "+ month+ "/", year )
 
-    for mes in mesesvalue:
-        print("empezamos carga e persitencia do mes "+ mes+ " do ano", ano )
-
-        if mes in {"01", "03", "05", "07", "08", "10", "12"}: #meses con 31 días
-            diasvalue=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28', '29','30', '31'])
-        if mes in {"04", "06", "09","11"}: #meses con 30 días
-            diasvalue=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28', '29','30'])
-        if (mes=="02")&(ano in {1980,1984,1988,1992,1996,2000, 2004,2008,2012,2016}): #año bisiesto febrero tiene 29 días
-            diasvalue=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28', '29'])
-            print(ano, "foi bisiesto")        
-        if (mes=="02")&(ano not in {1980,1984,1988,1992,1996,2000, 2004,2008,2012,2016}): #año no bisiesto febrero tiene 28 días
-            diasvalue=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28'])
+        if month in {"01", "03", "05", "07", "08", "10", "12"}: #meses con 31 días
+            daysvalues=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28', '29','30', '31'])
+        if month in {"04", "06", "09","11"}: #meses con 30 días
+            daysvalues=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28', '29','30'])
+        if (month=="02")&(year in {1980,1984,1988,1992,1996,2000, 2004,2008,2012,2016}): #año bisiesto febrero tiene 29 días
+            daysvalues=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28', '29'])
+            print(year, "was a leap year")        
+        if (month=="02")&(year not in {1980,1984,1988,1992,1996,2000, 2004,2008,2012,2016}): #año no bisiesto febrero tiene 28 días
+            daysvalues=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28'])
         
-        for dia in diasvalue:
-            for hora in horasvalue:
-                direccion="E:"'\\'+str(ano)+"\ARTMIP_MERRA_2D_"+str(ano)+mes+dia+"_"+hora+".nc"
-                ncfile = readnc(direccion, "r") #leemos los datos de esa imagen
+        for day in daysvalues:
+            print("día=",day)
+            for hour in hoursvalue:
+                if month== '01':
+                    print(hour)
+                path=hard_drive_letter+":/"+str(year)+"/ARTMIP_MERRA_2D_"+str(year)+month+day+"_"+hour+".nc"
+                ncfile = readnc(path, "r") #leemos los datos de esa imagen
                 iwp=ncfile.variables["IWV"][la,lo] ##cargamos la matriz de IWV en la región del estudio
                 im=im+1
                 nfila=nfila+1
@@ -172,21 +188,24 @@ for ano in np.arange(1980,2018,1):
                 conxuntocero={0}
                 indicador=np.zeros((iwp.shape[0], iwp.shape[1]))
 
-                for l in np.arange(60,- 1, -0.25): #bucle por umbral donde vamos a calcular las ccs del superlevelset asociado al umbral
+                for l in np.arange(60,- 1, -p): #bucle por umbral donde vamos a calcular las ccs del superlevelset asociado al umbral
                     umbral=-l
                     superlevel=np.uint8(np.array(iwp>l, dtype=np.int16))
                     ccs=cv2.connectedComponents(superlevel)[1]
-                    ccshawai=ccs[lathawai, :]  #cojemos las ccs que intersecan con las latitudes de hawai  
-                    listadeccs=[ccshawai[u, v] for u in np.arange(0,ccshawai.shape[0] , 1) for v in np.arange(0,ccshawai.shape[1] , 1)] 
-                    #inicializamos la lista con las ccs que intersecan con las latitudes de hawai
+                    ccshawai=ccs[hawai_matrix]  #cojemos las ccs que intersecan con las latitudes de hawai  
+                    if bug==1:
+                        ccsinteres=set(ccshawai.tolist()) #con el bug detectado se cuentan solo las ccc q intersequen hawwai
+                    else: 
+                        ccsinteres=set(ccshawai.tolist())|set(ccs[america].tolist())
+
+                    ccsinteres= ccsinteres  - conxuntocero
+                    # for k in np.arange(0,lats_used.shape[0] , 1): #bucle por latitud dónde añadimos a la lista las ccs que intersecan con América (en cada latitud)
+                    #     componentes=ccs[k, lons_america[k]] #array donde seleccionamos las ccs de la costa americana para la latitud k
+                    #     listadeccs=listadeccs+componentes.tolist() #las añadimos a la lista
                     
-                    for k in np.arange(0,lats_usadas.shape[0] , 1): #bucle por latitud dónde añadimos a la lista las ccs que intersecan con América (en cada latitud)
-                        componentes=ccs[k, lons_america[k]] #array donde seleccionamos las ccs de la costa americana para la latitud k
-                        listadeccs=listadeccs+componentes.tolist() #las añadimos a la lista
-                    ccsinteres=set(listadeccs) #pasamos la lista a conjunto (eliminando las repetidas)
                     
                     
-                    boolean=invect(ccs, ccsinteres-conxuntocero) #matriz que vale TRUE si ese i,j pertenece a una cc
+                    boolean=invect(ccs, ccsinteres) #matriz que vale TRUE si ese i,j pertenece a una cc
 
                     indicador=np.where(boolean, indicador+1, indicador) #esta matriz tiene un valor 0 si en ningún momento boolean fue true hasta ahora
                     #filterfun=np.where(boolean, np.where(indicador==1, umbral, filterfun) , umbral)
@@ -194,10 +213,10 @@ for ano in np.arange(1980,2018,1):
                     #cambiamos la filterfun para que no entren ccs en los superlevelsets que no intersequen las regiones de interés (america, hawai) en este umbral 
                     #de esta manera reducimos algún valor de la función en la rejilla hasta que no esté en una cc en los superlevelsets que no intersequen las regiones de interés (america, hawai)
                     #cambiamos signo xq gudhi solo considera sublevel y no superlevel sets
-                
+                                    
                 #Con este contador medimos cuanto cambia en media y máximo los cambios en la filterfun respecto de los valores iwp originales. Queda comentado pero se puede descomentar:
-                #contadorcambio=contadorcambio+np.amax(iwp+filterfun)
-                #contadorcambiomedia=contadorcambiomedia+np.mean(iwp+filterfun) #sumamos a los contadores la media y maximo de los cambios
+                contadorcambio=contadorcambio+np.amax(iwp+filterfun)
+                contadorcambiomedia=contadorcambiomedia+np.mean(iwp+filterfun) #sumamos a los contadores la media y maximo de los cambios
 
 
 
@@ -228,7 +247,7 @@ for ano in np.arange(1980,2018,1):
                 #edad_muerte_1=list(map(tiempovida, persi1)) #lista con la longitud de intervalos de persistencia de dim 0 de la imagen
                 #edades_muerte_1.append(edad_muerte_1)
     
-    print("en ano", ano, "hubo ", im, "imágenes")
+    print("en ano", year, "hubo ", im, "imágenes")
 print("hay un total de ", nfila, "imágenes")
 
 
@@ -329,15 +348,17 @@ gc.collect()
 
 ####### 10- Guardamos resultados
 x=pd.DataFrame(data) #hacemos data frame la lista data (de la vectorización de las persims)
-print("dataframe con imaxes de persistencia feito")
-if daily==1:
-    x.to_csv("C:/Users/David/OneDrive/Documents/mestrado/tfm-solicitude bolsa/piton/persim_estable_daily"+str(pixel_size_dimuno)+str(pixel_size_dimcero)+".csv")
-else:
-    x.to_csv("C:/Users/David/OneDrive/Documents/mestrado/tfm-solicitude bolsa/piton/persim_estable"+str(pixel_size_dimuno)+str(pixel_size_dimcero)+".csv")
+print("dataframe  with persistence images done")
+
+if (proof==0 and p==0.25):
+    if daily==1:
+        x.to_csv(f"C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton/persim_estable_daily{pixel_size_dimuno}{pixel_size_dimcero}_{pivot2}{bug_text}.csv")
+    else:
+        x.to_csv(f"C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton/persim_estable{pixel_size_dimuno}{pixel_size_dimcero}_{pivot2}{bug_text}.csv")
+    print("saved as csv")
 
 
 
-print("gardado como csv")
 del x
 gc.collect()
 
