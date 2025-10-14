@@ -6,9 +6,7 @@ import gudhi as gd
 import numpy as np
 import pandas as pd
 import cv2
-import math
 import numpy.ma as ma
-import scipy.misc 
 import itertools as it
 from persim import PersistenceImager
 import matplotlib.pyplot as plt
@@ -29,14 +27,14 @@ hor="00"
 
 nomes=["ano", "t"]
 pivot1=47.8
-pivot2=40.5
+pivot2=40.25
 pivot3=22.8
 lat_min=19
 lat_max=56
 lon_min=-179
 lon_max=-109
 daily=1 #vale 1 si consideramos solo datos con precisión diaria y no 3-horaria (cojemos los datos de las imágenes 0,8,16, ... corespondientes a las 00)
-bug=1 #vale 1 si queremos compararnos con el bug detectado en persim_estable del paper, otro valor es el caso contrario
+bug=0 #vale 1 si queremos compararnos con el bug detectado en persim_estable del paper, otro valor es el caso contrario
 if bug==1:
     bug_text="bug"
 else: 
@@ -44,10 +42,12 @@ else:
 
 proof = 0 # vale 1 si hacemos prueba con muchos menos imágenes
 
-p = 0.25
+p = 0.25 # paso en la función topológica
 
 
 hard_drive_letter="D"
+writing_path = "C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton"
+output_filename_prefix="persim_estable"
 
 pixel_size_dimcero=5#tamaño del pixel de las imágenes de persistencia de dimensión 0
 pixel_size_dimuno=4#tamaño del pixel de las imágenes de persistencia de dimensión 1
@@ -96,12 +96,6 @@ def myfunc(a, b):
     return a in b
 invect=np.vectorize(myfunc) #funcion que nos da una matriz booleana donde TRUE implica que el elemento a de la matriz imput está en el conjunto b
 
-def get_key(val, dicc):
-    for key, value in dicc.items():
-         if val == value:
-             return key
- 
-    return "There is no such Key"    ##función que nos da la clave de un elemento de un diccionario
 
 ####### 5- Definimos variables de tamaño y vectores para ciertos grupos. Inicializamos listas y valores.
 
@@ -133,7 +127,7 @@ diccionario={} ##diccionario que para cada año nos va a decir que número de im
 if proof==1: 
     yearsvalue=np.array([1980])
 else:
-    yearsvalue=np.arange(1980,2018,1)
+    yearsvalue=np.arange(1980,1981,1)
 
 nfila=0 ##contador del número de imágenes ya computadas
 
@@ -160,7 +154,7 @@ for year in yearsvalue:
         monthvalues=np.array([ '01', '02'])
 
     for month in monthvalues:
-        print("We begin to compute connected components of images of "+ month+ "/", year )
+        print(f"We begin to compute connected components of images of {month}/{year}")
 
         if month in {"01", "03", "05", "07", "08", "10", "12"}: #meses con 31 días
             daysvalues=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28', '29','30', '31'])
@@ -173,13 +167,14 @@ for year in yearsvalue:
             daysvalues=np.array(['01', '02', '03','04', '05', '06','07', '08', '09',"10", '11', '12', '13','14', '15', '16','17', '18', '19','20', '21', '22', '23','24', '25', '26','27', '28'])
         
         for day in daysvalues:
-            print("día=",day)
+            if day in ("01", "10", "20", "28", "29", "30", "31"):
+                print("día=",day)
             for hour in hoursvalue:
-                if month== '01':
+                if (month== '01' and day in ("01", "10", "20", "28", "29", "30", "31")):
                     print(hour)
                 path=hard_drive_letter+":/"+str(year)+"/ARTMIP_MERRA_2D_"+str(year)+month+day+"_"+hour+".nc"
                 ncfile = readnc(path, "r") #leemos los datos de esa imagen
-                iwp=ncfile.variables["IWV"][la,lo] ##cargamos la matriz de IWV en la región del estudio
+                iwp=ncfile.variables["IWV"][la,lo].filled(np.nan) ##cargamos la matriz de IWV en la región del estudio. Si hay valores enmascarados (no hay en nuestro dataset) se pasa a Nan
                 im=im+1
                 nfila=nfila+1
                 #primero modificamos la filterfun para quitarnos ccs que no intersequen las regiones de interés (latitudes de hawai y continente americano)
@@ -199,16 +194,12 @@ for year in yearsvalue:
                         ccsinteres=set(ccshawai.tolist())|set(ccs[america].tolist())
 
                     ccsinteres= ccsinteres  - conxuntocero
-                    # for k in np.arange(0,lats_used.shape[0] , 1): #bucle por latitud dónde añadimos a la lista las ccs que intersecan con América (en cada latitud)
-                    #     componentes=ccs[k, lons_america[k]] #array donde seleccionamos las ccs de la costa americana para la latitud k
-                    #     listadeccs=listadeccs+componentes.tolist() #las añadimos a la lista
-                    
+
                     
                     
                     boolean=invect(ccs, ccsinteres) #matriz que vale TRUE si ese i,j pertenece a una cc
 
                     indicador=np.where(boolean, indicador+1, indicador) #esta matriz tiene un valor 0 si en ningún momento boolean fue true hasta ahora
-                    #filterfun=np.where(boolean, np.where(indicador==1, umbral, filterfun) , umbral)
                     filterfun= np.where(indicador==1, umbral, filterfun)
                     #cambiamos la filterfun para que no entren ccs en los superlevelsets que no intersequen las regiones de interés (america, hawai) en este umbral 
                     #de esta manera reducimos algún valor de la función en la rejilla hasta que no esté en una cc en los superlevelsets que no intersequen las regiones de interés (america, hawai)
@@ -220,7 +211,10 @@ for year in yearsvalue:
 
 
 
-                filterfun_list = np.array([filterfun[u, v] for u in xval for v in yval]) #función de filtrado (lista con el IWV (modificado en el anterior bucle)  siguiendo orden lexicográfico de coordenadas)
+                filterfun_list =  filterfun.ravel()
+                #función de filtrado (lista con el IWV (modificado en el anterior bucle)  siguiendo orden lexicográfico de coordenadas)
+                assert iwp.shape == (longlat, longlon) #sale error si no se cumple la cond
+                
                 cc_river = gd.CubicalComplex( dimensions = [longlat ,longlon], 
                         top_dimensional_cells = filterfun_list
                         ) #construcción del complejo cúbico
@@ -228,13 +222,10 @@ for year in yearsvalue:
                 
 
                 persi=cc_river.persistence()    #guardamos la peristencia     
-                    
-                
                 filtro0 = filter(lambda featur: featur[0] == 0, persi)
+                persi0 = [featur[1] for featur in filtro0 if np.isfinite(featur[1][1])]   #lista con los intervalos de dim 0 y su dim (0 siempre)  
+                #eliminamos el intervalo infinito
 
-                persi0=list(filtro0) #lista con los intervalos de dim 0 y su dim (0 siempre)
-                persi0.pop(0)
-                persi0=[featur[1] for featur in persi0] #lista con los intervalos de persistencia de dim 0 de la imagen (menos el primero)
                 persis0.append(persi0)
                 #edad_muerte_0=list(map(tiempovida, persi0)) #lista con la longitud de intervalos de persistencia de dim 0 de la imagen (menos el primero)
                 #edades_muerte_0.append(edad_muerte_0)
@@ -246,33 +237,25 @@ for year in yearsvalue:
                 persis1.append(persi1)
                 #edad_muerte_1=list(map(tiempovida, persi1)) #lista con la longitud de intervalos de persistencia de dim 0 de la imagen
                 #edades_muerte_1.append(edad_muerte_1)
+
+                ### Limpiamos la memoria. Estas variables son internas del bucle
+                del iwp, filterfun, boolean, indicador, cc_river, persi
+                if im % 100 == 0:
+                    gc.collect()
     
-    print("en ano", year, "hubo ", im, "imágenes")
-print("hay un total de ", nfila, "imágenes")
-
-
-#### 7- Eliminamos datos no necesarios
-
-del iwp
-del filterfun
-del boolean
-del indicador
-del cc_river
-del persi
-gc.collect()
+    print("en ano", year, "hubo", im, "imágenes")
+print("hay un total de", nfila, "imágenes")
 
 
 
-#######8- CALCULAMOS LAS IMÁGENES DE PERSISTENCIA DE DIM=1
+#######7- CALCULAMOS LAS IMÁGENES DE PERSISTENCIA DE DIM=1
 
 
 
 pimgr = PersistenceImager(pixel_size=pixel_size_dimuno) #definimos la clase imagen de persistencia y ponemos una precisión
 
-pdgms=[] #lista donde para cada imagen obtenemos un array con los intervalos de persistencias (los intervalos de persistencias son listas y no tuples)
-for im in np.arange(0, nfila, 1): 
-    lst=[[featur[0],featur[1]] for featur in persis1[im]]
-    pdgms.append(np.asarray(lst))
+pdgms = [np.asarray(persis1[im], dtype=float) for im in range(nfila)] #lista donde para cada imagen obtenemos un array con los intervalos de persistencias (los intervalos de persistencias son listas y no tuples)
+
 
 
 pimgr.fit(pdgms, skew=True) #ajustamos el tamaño de imagen al rango máximo en la lista de las persistencias
@@ -287,28 +270,24 @@ gc.collect()
 pimgs = pimgr.transform(pdgms, skew=True, n_jobs=-1) #lista donde tenemos para cada im un array con los valores de la densidad en cada rejilla
 data = [] #lista donde para cada imagen añadiremos un vector con año, imagen, persimdim1 y persimdim0 aplanadas
 
-
+# Precalcular límites de año (solo una vez)
+sorted_years = sorted(diccionario.items(), key=lambda x: x[1])  # [(año, índice inicial), ...]
+year_indices = [v for _, v in sorted_years]
+years_sorted = [k for k, _ in sorted_years]
 
 
 for im in np.arange(0, nfila, 1):  ##para cada im añadimos en la lista data el año correspondiente, el número de la imagen en el año y la imagen de persistencia de dim 1 aplanada 
     xval = np.arange(0,tamaño_persis[0] , 1)
     yval = np.arange(0,tamaño_persis[1] , 1)
     valores_dicc=list(diccionario.values()) #calculamos el año en el que está la imagen a través de diccionario (tiene como llaves los años y el índice de la primera imagen )
-    if im not in set(valores_dicc):#si el índice de la imagen no es un valor (o elemento) del diccionario (i.e. no es la primera imagen de un año) entonces el año en el que estamos es la llave de la imagen justo menor a ella que esté en los values del diccionario
-        valores_dicc.append(im)
-        valores_dicc.sort()
-        ano=get_key(valores_dicc[valores_dicc.index(im)-1], diccionario)  ##get_key función que nos da la clave de un elemento de un diccionario
-
-    else: #si el índice de la imagen es un valor (o elemento) del diccionario (i.e. es la primera imagen de un año) entonces el año en el que estamos es la llave de ese valor
-        ano=get_key(valores_dicc[valores_dicc.index(im)],diccionario)  ## get_key función que nos da la clave de un elemento de un diccionario
-        print("comezamos a calcular imaxes de persistencia de dim 1 para o ano", ano)
-
-    imaxe_do_ano=im-diccionario[ano] #calculamos que número de imagen dentro de un año es im una vez ya sabemos el año y con diccionario[ano] el índice de la primera imagen de ese año
-    
+    # Buscamos el último año cuyo índice inicial ≤ im
+    idx = np.searchsorted(year_indices, im, side="right") - 1
+    ano = years_sorted[idx]
+    imaxe_do_ano = im - diccionario[ano]
     if daily==1:
-        data.append([ano,imaxe_do_ano*8]+[pimgs[im][u, v] for u in xval for v in yval]) #añadimos el array como lista aplanada a data
+        data.append([ano,imaxe_do_ano*8]+pimgs[im].ravel().tolist()) #añadimos el array como lista aplanada a data
     else: 
-        data.append([ano,imaxe_do_ano]+[pimgs[im][u, v] for u in xval for v in yval]) 
+        data.append([ano,imaxe_do_ano]+pimgs[im].ravel().tolist()) 
 
     
 
@@ -316,12 +295,9 @@ pdgms=[]#borro la memoria ya que vamos a reiniciar con dim 1
 pimgs=[]
 
 
-#######9- CALCULAMOS LAS IMÁGENES DE PERSISTENCIA DE DIM=0
+#######8- CALCULAMOS LAS IMÁGENES DE PERSISTENCIA DE DIM=0
 pimgr = PersistenceImager(pixel_size=pixel_size_dimcero) #definimos la clase imagen de persistencia y ponemos una precisión
-pdgms=[]  #lista donde para cada imagen obtenemos un array con los intervalos de persistencias (los intervalos de persistencias son listas y no tuples)
-for im in np.arange(0, nfila, 1): 
-    lst=[[featur[0],featur[1]] for featur in persis0[im]]
-    pdgms.append(np.asarray(lst))
+pdgms = [np.asarray(persis0[im], dtype=float) for im in range(nfila)]  #lista donde para cada imagen obtenemos un array con los intervalos de persistencias (los intervalos de persistencias son listas y no tuples)
 
 #print(pdgms, type(pdgms))
 pimgr.fit(pdgms, skew=True)#ajustamos el tamaño de imagen al rango máximo en la lista de las persistencias
@@ -340,21 +316,21 @@ for im in np.arange(0, nfila, 1): #añadimos a la fila im de data la imagen de p
     yval = np.arange(0,tamaño_persis[1] , 1)
     if im % 400==0:
         print("vamos por la imagen", im, "haciendo su imagen de persistencia de dim 0")
-    data[im]=data[im]+[pimgs[im][u, v] for u in xval for v in yval] #añadimos el array como lista aplanada a data[im] sumandola a la anterior
+    data[im].extend(pimgs[im].ravel().tolist()) #añadimos el array como lista aplanada a data[im] sumandola a la anterior
 
 del pdgms #borramos datos no necesarios
 del pimgs
 gc.collect()
 
-####### 10- Guardamos resultados
+####### 9- Guardamos resultados
 x=pd.DataFrame(data) #hacemos data frame la lista data (de la vectorización de las persims)
-print("dataframe  with persistence images done")
+print("dataframe with persistence images done")
 
 if (proof==0 and p==0.25):
     if daily==1:
-        x.to_csv(f"C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton/persim_estable_daily{pixel_size_dimuno}{pixel_size_dimcero}_{pivot2}{bug_text}.csv")
+        x.to_csv(f"{writing_path}/{output_filename_prefix}_daily{pixel_size_dimuno}{pixel_size_dimcero}_{pivot2}{bug_text}_temp.csv")
     else:
-        x.to_csv(f"C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton/persim_estable{pixel_size_dimuno}{pixel_size_dimcero}_{pivot2}{bug_text}.csv")
+        x.to_csv(f"{writing_path}/{output_filename_prefix}{pixel_size_dimuno}{pixel_size_dimcero}_{pivot2}{bug_text}_temp.csv")
     print("saved as csv")
 
 
