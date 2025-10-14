@@ -37,6 +37,8 @@ daily = 0 #vale 1 si consideramos solo datos con precisión diaria y no 3-horari
 proof = 0 # vale 1 si hacemos prueba con muchos menos imágenes
 
 hard_drive_letter="D"
+writing_path = "C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton"
+output_filename_prefix="cv2_vectors"
 
 p= 1 
 thresholds = np.arange(-60, 1, p )
@@ -151,7 +153,7 @@ for year in yearsvalue:
 output=pd.DataFrame(vectors)
 
 if daily==1:
-    output.to_csv(f"C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton/cv2_vectors_{p}_daily_until_{month}_{year}_{pivot2}.csv")
+    output.to_csv(f"{writing_path}/{output_filename_prefix}_{p}_daily_until_{month}_{year}_{pivot2}.csv")
 else:  
-    output.to_csv(f"C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton/cv2_vectors_{p}_until_{month}_{year}_{pivot2}.csv")
+    output.to_csv(f"{writing_path}/{output_filename_prefix}_{p}_until_{month}_{year}_{pivot2}.csv")
 

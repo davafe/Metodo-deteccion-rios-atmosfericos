@@ -21,6 +21,9 @@ from local_functions.matrix import *
 
 x=pd.DataFrame(columns=["ano", "imagen", "AR"]) #creamos un data frame dónde incluiremos para cada imagen el año, núm de imagen (dentro de ese año) y la etiqueta de si es AR
 
+
+writing_path = "C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton"
+output_filename_prefix="etiquetas_merra_2"
 hard_drive_letter="E"
 carpeta_merra_labels="merra_labels"
 direccion=f"{hard_drive_letter}:/{carpeta_merra_labels}/MERRA2.ar_tag.cascade_bard_v1.3hourly."+str(1980)+".nc4"
@@ -112,11 +115,11 @@ for year in np.arange(1980, 2018, 1): #para cada año cargamos los datos y sacam
 
 ########### 7-cargamos datos a un csv
 if daily==1:
-    #x.to_csv("C:/Users/David/OneDrive/Documents/mestrado/tfm-solicitude bolsa/piton/etiquetas_merra_daily.csv")
-    #x.to_csv("C:/Users/David/OneDrive/Documents/mestrado/tfm-solicitude bolsa/piton/pruebatonta_daily.csv")
-    x.to_csv("C:/Users/David/OneDrive/Documents/tfm-solicitude bolsa/piton/etiquetas_merra_2_daily.csv")
+    #x.to_csv(f"{writing_path}/etiquetas_merra_daily.csv")
+    #x.to_csv(f"{writing_path}/pruebatonta_daily.csv")
+    x.to_csv(f"{writing_path}/{output_filename_prefix}_daily.csv")
 
 else:
-    #x.to_csv("C:/Users/David/OneDrive/Documents/mestrado/tfm-solicitude bolsa/piton/etiquetas_merra.csv")
-    #x.to_csv("C:/Users/David/OneDrive/Documents/mestrado/tfm-solicitude bolsa/piton/pruebatonta.csv")
-    x.to_csv("C:/Users/David/OneDrive/Documents/tfm-solicitude bolsa/piton/etiquetas_merra_2.csv")
+    #x.to_csv(f"{writing_path}/etiquetas_merra.csv")
+    #x.to_csv(f"{writing_path}/pruebatonta.csv")
+    x.to_csv(f"{writing_path}/{output_filename_prefix}.csv")
