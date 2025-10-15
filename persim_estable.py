@@ -127,7 +127,7 @@ diccionario={} ##diccionario que para cada año nos va a decir que número de im
 if proof==1: 
     yearsvalue=np.array([1980])
 else:
-    yearsvalue=np.arange(1980,1981,1)
+    yearsvalue=np.arange(1980,2018,1)
 
 nfila=0 ##contador del número de imágenes ya computadas
 
