@@ -14,8 +14,9 @@ library(e1071)
 library(MASS)
 library(caret)
 
-
-daily <- 1 #si vale 1 solo se usan fotos con frecuencia diaria, otro valor se usan fotos con frecuencia 3-horaria
+semilla<-2
+reading_path <- "~/apuntamentos-non-opo/TFM/piton/"
+daily <-1 #si vale 1 solo se usan fotos con frecuencia diaria, otro valor se usan fotos con frecuencia 3-horaria
 
 
 #Variables que indican si se escala en cada algoritmo:
@@ -23,11 +24,11 @@ daily <- 1 #si vale 1 solo se usan fotos con frecuencia diaria, otro valor se us
 #y 2o :para el modelo final, se hace lo mismo solo que calculando para train+validación
 # y aplicandolas para train+validación y test
 
-escalar_KNN <- TRUE
-escalar_SVM_RAD<- FALSE 
+escalar_KNN <- FALSE
+escalar_SVM_RAD<- FALSE
 escalar_SVM_LINEAL<- FALSE #TRUE
 escalar_SVM_POLIN<- FALSE 
-escalar_SVM_SIGMO<- FALSE 
+escalar_SVM_SIGMO<- TRUE
 
 # Umbral usado en la probabilidad para predecir AR en regresión logística
 
@@ -134,22 +135,23 @@ preparar_datasets_modelo_validado <- function(x_entreno, y_entreno, x_val, y_val
 ##### 2. Carga y tratamiento de datos
 
 
-if (daily==1){ topological_info<-as.data.table(read_csv("../../cv2_vectors_0.25_daily_until_06_2017_40.25.csv", 
+if (daily==1){ topological_info<-as.data.table(read_csv(paste0(reading_path,"cv2_vectors_0.25_daily_until_06_2017_40.25", ".csv"), 
                                               col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                                t = col_double()))) 
+
 }else{
-  topological_info<-as.data.table(read_csv("../../cv2_vectors_0.25_until_06_2017_40.25.csv", 
+  topological_info<-as.data.table(read_csv(paste0(reading_path,"cv2_vectors_0.25_until_06_2017_40.25", ".csv"), 
                                  col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                   t = col_double())))
 }
 
 
 if(daily==1) {
-  etiquetas<-as.data.table(read_csv("../../etiquetas_merra_2_daily.csv", 
+  etiquetas<-as.data.table(read_csv(paste0(reading_path,"etiquetas_merra_2_daily", ".csv"), 
                                     col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                      t = col_double())))
 } else {
-  etiquetas<-as.data.table(read_csv("../../etiquetas_merra_2.csv", 
+  etiquetas<-as.data.table(read_csv(paste0(reading_path,"etiquetas_merra_2", ".csv"), 
                                     col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                      t = col_double())))
 }
@@ -201,7 +203,7 @@ x <- x[,..cols_con_varianza]
 nfilas_equilibrado=dim(dataset_equilibrado)[1]
 indices<-1:nfilas_equilibrado
 
-set.seed(2)
+set.seed(semilla)
 
 permutacion_indices<-sample(indices, size=nfilas_equilibrado)
 
@@ -214,8 +216,7 @@ fold[[5]]<-permutacion_indices[((4*floor(0.20*nfilas_equilibrado))+1):nfilas_equ
 #fold
 
 
-#fijamos semilla única para todos los métodos de ML
-set.seed(456)
+
 
 
 ####  4 KNN 
@@ -243,7 +244,7 @@ datasets_mod <- generar_folds_datos(
   escalar = escalar_KNN
 )
 
-
+set.seed(semilla)
 for (i in 1:5){
   
   cat("iteracion", i, "\n")
@@ -276,7 +277,7 @@ for (i in 1:5){
                                                           x_val     = datasets_mod[[i]]$x_val,
                                                           y_val     = datasets_mod[[i]]$y_val,
                                                           x_test    = datasets_mod[[i]]$x_test,
-                                                          escalar = escalar_SVM_RAD  )
+                                                          escalar = escalar_KNN  )
   
   pred_test<-knn(train=datasets_mod_valid$x_train_and_val_preproc, test=datasets_mod_valid$x_test, cl=datasets_mod_valid$y_train_and_val , k = k,use.all=FALSE, prob=FALSE) 
   

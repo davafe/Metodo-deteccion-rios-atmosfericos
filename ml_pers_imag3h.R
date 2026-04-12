@@ -14,22 +14,21 @@ library(e1071)
 library(MASS)
 library(caret)
 
+semilla<-2
 
-###MIRAR SI SE HA PUESTO EL ROWNAME COMO COLUMNA EN LOS READ_csv, EN FUNCION DE ESO ELIMINAR LA PRIMERA COLUMNA O NO EN EL MERGE (PARA AMBOS DATA TABLE)
-###TAMBIEN SI SE PUSO EL ROWNAME COMO COLUMNA CAMBIAR LO TRATAR POR SEPAREADO A
-#LOS NNOMBRES DE COLUMNA 1,2 POR LOS NOMBRES DE COLUMNA 1,2,3
+reading_path <- "~/apuntamentos-non-opo/TFM/piton/"
 
 
-daily <- 1 #si vale 1 solo se usan fotos con frecuencia diaria, otro valor se usan fotos con frecuencia 3-horaria
-topo_dims_used <- 4 #si vale 0 solo se usa la dimensión 0, si vale 1 solo se usa la dimensión 1; si otro valor se usan ambas
+daily <- 0 #si vale 1 solo se usan fotos con frecuencia diaria, otro valor se usan fotos con frecuencia 3-horaria
+topo_dims_used <- 1 #si vale 0 solo se usa la dimensión 0, si vale 1 solo se usa la dimensión 1; si otro valor se usan ambas
 
 #Variables que indican si se escala en cada algoritmo:
 # 1o: se calculan medias y varianzas en train y se aplican a train y a validación,
 #y 2o :para el modelo final, se hace lo mismo solo que calculando para train+validación
 # y aplicandolas para train+validación y test
 
-escalar_KNN <- FALSE
-escalar_SVM_RAD<- TRUE 
+escalar_KNN <- TRUE
+escalar_SVM_RAD<- FALSE
 escalar_SVM_LINEAL<- FALSE #TRUE
 escalar_SVM_POLIN<- FALSE 
 escalar_SVM_SIGMO<- FALSE 
@@ -140,11 +139,11 @@ preparar_datasets_modelo_validado <- function(x_entreno, y_entreno, x_val, y_val
 
 
 ##### 2. Carga y tratamiento de datos
-if (daily==1){ persim<-as.data.table(read_csv("~/apuntamentos-non-opo/TFM/piton/persim_estable_daily45.csv", 
+if (daily==1){ persim<-as.data.table(read_csv(paste0(reading_path,"persim_estable_daily45_40.25", ".csv"), 
                                               col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                                t = col_double()))) 
 }else{
-persim<-as.data.table(read_csv("~/apuntamentos-non-opo/TFM/piton/persim_estable45.csv", 
+persim<-as.data.table(read_csv(paste0(reading_path,"persim_estable45_40.25", ".csv"), 
                                col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                 t = col_double())))
 }
@@ -152,11 +151,11 @@ persim<-as.data.table(read_csv("~/apuntamentos-non-opo/TFM/piton/persim_estable4
 
 
 if(daily==1) {
-  etiquetas<-as.data.table(read_csv("~/apuntamentos-non-opo/TFM/piton/etiquetas_merra_daily.csv", 
+  etiquetas<-as.data.table(read_csv(paste0(reading_path,"etiquetas_merra_2_daily", ".csv"), 
                                     col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                      t = col_double())))
 } else {
-etiquetas<-as.data.table(read_csv("~/apuntamentos-non-opo/TFM/piton/etiquetas_merra.csv", 
+etiquetas<-as.data.table(read_csv(paste0(reading_path,"etiquetas_merra_2", ".csv"), 
                                                      col_types = cols(...1 = col_skip(), ano = col_double(), 
                                                               t = col_double())))
 }
@@ -212,7 +211,7 @@ x <- dataset_equilibrado[, -(1:3)]
 nfilas_equilibrado=dim(dataset_equilibrado)[1]
 indices<-1:nfilas_equilibrado
 
-set.seed(2)
+set.seed(semilla)
 
 permutacion_indices<-sample(indices, size=nfilas_equilibrado)
 
@@ -251,7 +250,7 @@ datasets_mod <- generar_folds_datos(
   escalar = escalar_KNN
 )
 
-
+set.seed(semilla)
 for (i in 1:5){
   
   cat("iteracion", i, "\n")
@@ -284,7 +283,7 @@ for (i in 1:5){
                                                           x_val     = datasets_mod[[i]]$x_val,
                                                           y_val     = datasets_mod[[i]]$y_val,
                                                           x_test    = datasets_mod[[i]]$x_test,
-                                                          escalar = escalar_SVM_RAD  )
+                                                          escalar = escalar_KNN  )
   
   pred_test<-knn(train=datasets_mod_valid$x_train_and_val_preproc, test=datasets_mod_valid$x_test, cl=datasets_mod_valid$y_train_and_val , k = k,use.all=FALSE, prob=FALSE) 
   
@@ -336,8 +335,8 @@ for (i in 1:5){
   cat("iteración ", i, "\n")
   acu<-matrix(NA, nrow=0, ncol=3)
   colnames(acu)<-c("gama", "c", "acc")
-  for (gama in seq(0.0005, 0.0115, 0.0015)) { #antes seq(0.009, 0.025, 0.002), seq(0.0055, 0.013, 0.0015), seq(0.005, 0.019, 0.002) o seq(0.0005, 0.010, 0.0015) o seq(0.017, 0.033, 0.002)
-    for (c in c(0.25,1,2,4) ){ #antes c(1,2,4,8) c(4,8,12,18) o c(1,2,4,8) o c(0.25, 0.5, 0.75, 1)
+  for (gama in seq(0.0005, 0.0115, 0.0015)) { #antes seq(0.0055, 0.013, 0.0015), seq(0.009, 0.025, 0.002), , seq(0.005, 0.019, 0.002) o seq(0.0005, 0.010, 0.0015) o seq(0.017, 0.033, 0.002)
+    for (c in c(0.25,1,2,4) ){ #antes c(2,4,8,16) c(0.25,1,2,4) c(1,2,4,8) c(4,8,12,18) o c(1,2,4,8) o c(0.25, 0.5, 0.75, 1)
       
       qdebien<-svm(x=datasets_mod[[i]]$x_train_preproc, y=datasets_mod[[i]]$y_train, scale=FALSE, type="C-classification", kernel="radial", cost=c, gamma=gama)
       predictingcontent<- predict(qdebien, datasets_mod[[i]]$x_val_preproc) #predict(qdebien, scale(conjunto_validacion[,-c(1,2,3)]))
