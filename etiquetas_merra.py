@@ -24,14 +24,14 @@ x=pd.DataFrame(columns=["ano", "imagen", "AR"]) #creamos un data frame dónde in
 
 writing_path = "C:/Users/U000000/Documents/apuntamentos-non-opo/TFM/piton"
 output_filename_prefix="etiquetas_merra_2"
-hard_drive_letter="E"
+hard_drive_letter="D"
 carpeta_merra_labels="merra_labels"
 direccion=f"{hard_drive_letter}:/{carpeta_merra_labels}/MERRA2.ar_tag.cascade_bard_v1.3hourly."+str(1980)+".nc4"
 #direccion="C:/Users/David/OneDrive/Documents/mestrado/tfm-solicitude bolsa/piton/MERRA2.ar_tag.cascade_bard_v1.3hourly."+str(1980)+".nc4"
 daily=0 #daily=1 si usamos solo pricisión temporal de 24 h. daily=!1-> precisión temporal de 3 h 
-pivote1=47.8
-pivote2=40.25
-pivote3=22.8
+pivot1=47.8
+pivot2=40.25
+pivot3=22.8
 lat_min=19
 lat_max=56
 lon_min=-179
@@ -66,10 +66,11 @@ num_lons_usadas=lons_usadas.shape[0]
 
 
                                                                     
-lathawai=(lat[la]>=19)&(lat[la]<22.8) #vector dónde hay un TRUE si ese índice se corresponde con la latitud de HAwai
+lathawai=(lat[la]>=lat_min)&(lat[la]<pivot3) 
+#vector dónde hay un TRUE si ese índice se corresponde con la latitud de HAwai
 
 
-region_america=obtain_boolean_matrix(lats_usadas, lons_usadas, pivote1, pivote2, pivote3)
+region_america=obtain_boolean_matrix(lats_usadas, lons_usadas, pivot1, pivot2, pivot3)
                                                                         
 region_hawai = np.tile(lathawai[:, np.newaxis], (1, num_lons_usadas))
 
